@@ -36,3 +36,29 @@ yarn-error.log*
 next-env.d.ts
 
 .vscode/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Dependency directories (Backend & Frontend)
+node_modules/
+
+# Environment variables (SECURITY CRITICAL: NEVER UPLOAD THIS)
+.env
+.env.local
+
+# Production build directories
+dist/
+build/
+
+# Editor and IDE configurations
+.vscode/
+.idea/
+*.suo
+*.sln
+
+# OS metadata
+.DS_Store
+Thumbs.db
