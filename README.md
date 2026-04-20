@@ -17,11 +17,11 @@
 The **ACID Banking Simulation Engine** is not just a standard CRUD application; it is an educational tool designed to visualize and test the deep mechanics of Relational Database Management Systems. Built with a Node.js/Express backend and a React dashboard, this system acts as a sandbox to interact with a highly structured, BCNF-normalized MySQL 8.0 (InnoDB) database.
 
 ### 🎓 Academic Context
-**Developers:** Shivam Mishra (Roll No: IIT2024215)  
-                Ayush Anand (Roll No: IIT2024246)
-                Neel Ghule (Roll No: IIT2024267)
-                Adabala Sridhar (Roll No: IIT2024218)
-                Anjan Shivareddy (Roll No: IIT2024   )
+**Developers:** -Shivam Mishra (Roll No: IIT2024215)  
+                -Ayush Anand (Roll No: IIT2024246)
+                -Neel Ghule (Roll No: IIT2024267)
+                -Adabala Sridhar (Roll No: IIT2024218)
+                -Anjan Shivareddy (Roll No: IIT2024   )
 **Program:** Information Technology  
 **Institution:** Indian Institute of Information Technology, Allahabad (IIITA)
 
