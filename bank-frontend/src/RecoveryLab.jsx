@@ -209,7 +209,7 @@ export default function RecoveryLab() {
           <span className="rl-badge">ACID DEMO</span>
           <h2 className="rl-title">💥 Crash Recovery Lab</h2>
           <p className="rl-subtitle">
-            Proving <strong>Atomicity</strong> &amp; <strong>Write-Ahead Logging (WAL)</strong> — watch $1 M
+            Proving <strong>Atomicity</strong> &amp; <strong>Write-Ahead Logging (WAL)</strong> — watch $100K 
             float in the InnoDB Buffer Pool, then either commit cleanly <em>or</em> survive a sudden kill
             and roll back via the Redo Log.
           </p>
@@ -371,7 +371,7 @@ export default function RecoveryLab() {
 
           <StepCard
             step="01"
-            title="Start $1M Transfer"
+            title="Start $100K Transfer"
             desc="Initiates a slow 15-second transaction. Money enters the Buffer Pool but is NOT yet committed to disk."
             color="amber"
             disabled={phase !== PHASE.IDLE}

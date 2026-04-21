@@ -55,8 +55,8 @@ app.post('/api/crash-lab/start-transfer', async (req, res) => {
         });
 
         await connection.query('START TRANSACTION');
-        await connection.query('UPDATE Accounts SET balance = balance - 1000000 WHERE account_id = 3');
-        await connection.query('UPDATE Accounts SET balance = balance + 1000000 WHERE account_id = 1');
+        await connection.query('UPDATE Accounts SET balance = balance - 100000 WHERE account_id = 3');
+        await connection.query('UPDATE Accounts SET balance = balance + 100000 WHERE account_id = 1');
         
         // Hold the connection open for 15 seconds
         setTimeout(async () => {

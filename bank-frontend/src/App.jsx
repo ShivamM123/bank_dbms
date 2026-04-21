@@ -111,7 +111,7 @@ function App() {
           <div className="glass-card chart-container">
             <h3 className="section-title">System Telemetry</h3>
             <div className="chart-wrapper"><Bar data={chartData} options={chartOptions} /></div>
-            <p className="chart-footer">* Live transaction isolation graphs will populate here during Final Evaluation.</p>
+            <p className="chart-footer"></p>
           </div>
         </div>
       )}
