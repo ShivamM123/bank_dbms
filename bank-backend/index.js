@@ -92,6 +92,53 @@ app.post('/api/crash-lab/recover', (req, res) => {
     });
 });
 
+// ==========================================
+// 🚦 CONCURRENCY LAB ROUTES
+// ==========================================
+
+// Transaction A: The Saboteur (Creates a Dirty state for 5 seconds)
+app.post('/api/concurrency/tx-a', async (req, res) => {
+    const connection = await pool.getConnection(); // Grab a dedicated line
+    try {
+        await connection.query('START TRANSACTION');
+        // Deduct $1000 from Alice (Account 1)
+        await connection.query('UPDATE Accounts SET balance = balance - 1000 WHERE account_id = 1');
+
+        // Hold the dirty state in RAM for 5 seconds, then intentionally FAIL and rollback
+        setTimeout(async () => {
+            await connection.query('ROLLBACK');
+            connection.release();
+            console.log("Tx A: Rolled back dirty data.");
+        }, 5000);
+
+        res.json({ message: 'Tx A Started. Deducted $1000. Holding uncommitted state for 5s...' });
+    } catch (error) {
+        connection.release();
+        res.status(500).json({ error: 'Tx A failed' });
+    }
+});
+
+// Transaction B: The Reader
+app.get('/api/concurrency/tx-b', async (req, res) => {
+    const { isolation } = req.query; // e.g., 'READ UNCOMMITTED' or 'READ COMMITTED'
+    const connection = await pool.getConnection();
+    try {
+        // Set the specific isolation level for this session
+        await connection.query(`SET SESSION TRANSACTION ISOLATION LEVEL ${isolation}`);
+        await connection.query('START TRANSACTION');
+        
+        // Attempt to read Alice's balance
+        const [rows] = await connection.query('SELECT balance FROM Accounts WHERE account_id = 1');
+        
+        await connection.query('COMMIT');
+        connection.release();
+
+        res.json({ balance: rows[0].balance, isolation_used: isolation });
+    } catch (error) {
+        connection.release();
+        res.status(500).json({ error: 'Tx B failed' });
+    }
+});
 // Start the Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
