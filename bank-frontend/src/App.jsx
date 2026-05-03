@@ -4,6 +4,8 @@ import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 import ConcurrencyLab from './ConcurrencyLab'; // Importing your new lab
 import './App.css';
+import RecoveryLab from './RecoveryLab';
+import './RecoveryLab.css';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
