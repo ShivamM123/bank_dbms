@@ -15,10 +15,10 @@ app.get('/api/accounts/:id', async (req, res) => {
     try {
         const accountId = req.params.id;
         const [rows] = await pool.query(
-            'SELECT a.account_id, a.balance, u.full_name FROM Accounts a JOIN Users u ON a.user_id = u.user_id WHERE a.account_id = ?', 
+            'SELECT a.account_id, a.balance, u.full_name FROM Accounts a JOIN Users u ON a.user_id = u.user_id WHERE a.account_id = ?',
             [accountId]
         );
-        
+
         if (rows.length === 0) return res.status(404).json({ error: 'Account not found' });
         res.json(rows[0]);
     } catch (error) {
@@ -51,13 +51,13 @@ app.post('/api/crash-lab/start-transfer', async (req, res) => {
             user: process.env.DB_USER || 'root',
             password: 'password', // Hardcoded for the Docker container
             database: process.env.DB_NAME || 'bank_db',
-            port: 3307 
+            port: 3307
         });
 
         await connection.query('START TRANSACTION');
         await connection.query('UPDATE Accounts SET balance = balance - 100000 WHERE account_id = 3');
         await connection.query('UPDATE Accounts SET balance = balance + 100000 WHERE account_id = 1');
-        
+
         // Hold the connection open for 15 seconds
         setTimeout(async () => {
             try {
@@ -126,14 +126,128 @@ app.get('/api/concurrency/tx-b', async (req, res) => {
         // Set the specific isolation level for this session
         await connection.query(`SET SESSION TRANSACTION ISOLATION LEVEL ${isolation}`);
         await connection.query('START TRANSACTION');
-        
+
         // Attempt to read Alice's balance
         const [rows] = await connection.query('SELECT balance FROM Accounts WHERE account_id = 1');
-        
+
         await connection.query('COMMIT');
         connection.release();
 
         res.json({ balance: rows[0].balance, isolation_used: isolation });
+    } catch (error) {
+        connection.release();
+        res.status(500).json({ error: 'Tx B failed' });
+    }
+});
+
+// ==========================================
+// 👻 PHANTOM READ & SERIALIZABLE LAB
+// ==========================================
+
+// Phantom Tx A: The Range Auditor
+app.get('/api/concurrency/phantom-tx-a', async (req, res) => {
+    const { isolation } = req.query;
+    const connection = await pool.getConnection();
+    try {
+        await connection.query(`SET SESSION TRANSACTION ISOLATION LEVEL ${isolation}`);
+        await connection.query('START TRANSACTION');
+
+        // 1. Read the number of accounts
+        const [rows1] = await connection.query('SELECT COUNT(*) as total FROM Accounts');
+        const count1 = rows1[0].total;
+
+        // 2. Pause for 5 seconds to give Tx B a chance to sneak a row in
+        await new Promise(resolve => setTimeout(resolve, 5000));
+
+        // 3. Read the number of accounts again!
+        const [rows2] = await connection.query('SELECT COUNT(*) as total FROM Accounts');
+        const count2 = rows2[0].total;
+
+        await connection.query('COMMIT');
+        connection.release();
+
+        res.json({ count1, count2, isolation_used: isolation });
+    } catch (error) {
+        connection.release();
+        res.status(500).json({ error: 'Phantom Tx A failed' });
+    }
+});
+
+// Phantom Tx B: The Phantom Inserter
+app.post('/api/concurrency/phantom-tx-b', async (req, res) => {
+    const connection = await pool.getConnection();
+    try {
+        await connection.query('START TRANSACTION');
+        // Insert a "Phantom" account into the database
+        await connection.query(`INSERT INTO Accounts (user_id, account_type, balance, status) VALUES (1, 'Checking', 777, 'Active')`);
+        await connection.query('COMMIT');
+        connection.release();
+
+        // Auto-cleanup: Delete the phantom row after 10 seconds so the DB stays clean for the next test
+        setTimeout(async () => {
+            const cleanConn = await pool.getConnection();
+            await cleanConn.query(`DELETE FROM Accounts WHERE balance = 777`);
+            cleanConn.release();
+        }, 10000);
+
+        res.json({ message: 'Phantom Row Inserted Successfully! ($777)' });
+    } catch (error) {
+        connection.release();
+        res.status(500).json({ error: 'Tx B failed. It might have been locked!' });
+    }
+});
+
+// ==========================================
+// 🔁 NON-REPEATABLE READ LAB
+// ==========================================
+
+// Repeatable Tx A: The Snapshot Reader
+app.get('/api/concurrency/repeat-tx-a', async (req, res) => {
+    const { isolation } = req.query;
+    const connection = await pool.getConnection();
+    try {
+        await connection.query(`SET SESSION TRANSACTION ISOLATION LEVEL ${isolation}`);
+        await connection.query('START TRANSACTION');
+
+        // Read 1
+        const [rows1] = await connection.query('SELECT balance FROM Accounts WHERE account_id = 1');
+        const read1 = rows1[0].balance;
+
+        // Pause for 5 seconds to let Tx B sneak an update in
+        await new Promise(resolve => setTimeout(resolve, 5000));
+
+        // Read 2
+        const [rows2] = await connection.query('SELECT balance FROM Accounts WHERE account_id = 1');
+        const read2 = rows2[0].balance;
+
+        await connection.query('COMMIT');
+        connection.release();
+
+        res.json({ read1, read2, isolation_used: isolation });
+    } catch (error) {
+        connection.release();
+        res.status(500).json({ error: 'Repeatable Tx A failed' });
+    }
+});
+
+// Repeatable Tx B: The Sneaky Updater
+app.post('/api/concurrency/repeat-tx-b', async (req, res) => {
+    const connection = await pool.getConnection();
+    try {
+        await connection.query('START TRANSACTION');
+        // Deduct $50 and commit IMMEDIATELY
+        await connection.query('UPDATE Accounts SET balance = balance - 50 WHERE account_id = 1');
+        await connection.query('COMMIT');
+        connection.release();
+
+        // Auto-cleanup: Add the $50 back after 10 seconds so the DB stays clean
+        setTimeout(async () => {
+            const cleanConn = await pool.getConnection();
+            await cleanConn.query('UPDATE Accounts SET balance = balance + 50 WHERE account_id = 1');
+            cleanConn.release();
+        }, 10000);
+
+        res.json({ message: '$50 Deducted and COMMITTED!' });
     } catch (error) {
         connection.release();
         res.status(500).json({ error: 'Tx B failed' });
@@ -153,13 +267,13 @@ app.get('/api/crash-lab/monitor', async (req, res) => {
             user: process.env.DB_USER || 'root',
             password: 'password', // Docker password
             database: process.env.DB_NAME || 'bank_db',
-            port: 3307 
+            port: 3307
         });
 
         // This is the magic line that lets us peek at uncommitted RAM data
         await connection.query('SET SESSION TRANSACTION ISOLATION LEVEL READ UNCOMMITTED');
         const [rows] = await connection.query('SELECT account_id, balance FROM Accounts WHERE account_id IN (1, 3)');
-        
+
         await connection.end();
         res.json(rows);
     } catch (error) {
