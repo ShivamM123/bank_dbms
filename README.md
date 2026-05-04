@@ -21,7 +21,7 @@ The **ACID Banking Simulation Engine** is not just a standard CRUD application; 
                 -Ayush Anand (Roll No: IIT2024246)
                 -Neel Ghule (Roll No: IIT2024267)
                 -Adabala Sridhar (Roll No: IIT2024218)
-                -Anjan Shivareddy (Roll No: IIT2024   )
+                -Bendram Anjan Shiva Reddy (Roll No: IIT2024265)
 **Program:** Information Technology  
 **Institution:** Indian Institute of Information Technology, Allahabad (IIITA)
 
