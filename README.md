@@ -33,7 +33,7 @@ Developed by Information Technology students at the **Indian Institute of Inform
 
 ## 📖 Project Overview
 
-The **ACID Core Engine** is not just a banking application; it is an educational telemetry dashboard that exposes the internal mechanics of the MySQL InnoDB storage engine. 
+The **ACID Core Engine** is not just a banking application, it is an educational telemetry dashboard that exposes the internal mechanics of the MySQL InnoDB storage engine. 
 
 While most academic projects stop at CRUD operations, this project forces the database into highly volatile states (race conditions, mid-transaction mutations, heavy I/O scans) and provides a visual interface to see exactly how the engine resolves these anomalies using isolation tiers and structural optimizations.
 
