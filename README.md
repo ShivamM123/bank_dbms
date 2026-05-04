@@ -10,8 +10,6 @@ An advanced, interactive Database Management System (DBMS) simulator designed to
 ---
 
 ## 👥 Meet the Team
-
-<<<<<<< HEAD
 Developed by Information Technology students at the **Indian Institute of Information Technology, Allahabad (IIITA)**.
 
 | Developer | Roll Number |
@@ -30,7 +28,6 @@ Developed by Information Technology students at the **Indian Institute of Inform
                 -Bendram Anjan Shiva Reddy (Roll No: IIT2024265)
 **Program:** Information Technology  
 **Institution:** Indian Institute of Information Technology, Allahabad (IIITA)
->>>>>>> 446f4eede29c05132e0f740f18dd6ece8bf185fe
 
 ---
 
@@ -121,7 +118,6 @@ npm run dev
 
 ---
 
-<<<<<<< HEAD
 ## 📚 Key SQL Concepts Demonstrated
 * `START TRANSACTION`, `COMMIT`, `ROLLBACK`
 * Pessimistic Locking: `SELECT ... FOR UPDATE`
@@ -136,6 +132,5 @@ EXPLAIN ANALYZE
 Trigger and Stored Procedure creation (DELIMITER)
 
 Foreign Key Constraints (ON DELETE RESTRICT)
->>>>>>> 446f4eede29c05132e0f740f18dd6ece8bf185fe
 
 
