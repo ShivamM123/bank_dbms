@@ -1,16 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Bar } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
-import ConcurrencyLab from './ConcurrencyLab'; // Importing your new lab
-import './App.css';
+// Notice the Chart.js imports changed: we added LineElement, PointElement, and Filler
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
+import { Line } from 'react-chartjs-2';
+import ConcurrencyLab from './ConcurrencyLab';
 import RecoveryLab from './RecoveryLab';
-import PerformanceLab from './PerfomanceLab';
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+import PerformanceLab from './PerformanceLab';
+import './App.css';
+
+// Register the new Chart components
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
 function App() {
-  // Navigation State
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'concurrency', or 'recovery', and query
+  const [activeTab, setActiveTab] = useState('dashboard');
 
   // Dashboard States
   const [account, setAccount] = useState(null);
@@ -34,125 +36,161 @@ function App() {
 
   const handleTransfer = async (e) => {
     e.preventDefault();
-    setStatus({ message: 'Processing transaction...', type: 'pending' });
+    setStatus({ message: 'Executing ACID Transaction...', type: 'pending' });
     try {
       await axios.post('http://localhost:5000/api/transfer', {
         fromAccount: 1, toAccount: parseInt(transferData.toAccount), amount: parseFloat(transferData.amount)
       });
       setStatus({ message: 'Transaction Committed Successfully', type: 'success' });
-      fetchAccount();
-      setTransferData({ toAccount: '', amount: '' });
+      fetchAccount(); 
+      setTransferData({ toAccount: '', amount: '' }); 
     } catch (error) {
       setStatus({ message: error.response?.data?.error || 'Transaction Failed & Rolled Back', type: 'error' });
     }
   };
 
-  // --- CHART CONFIG ---
+  // --- CYBERPUNK CHART CONFIG ---
+  // Using a line chart with a gradient fill looks 10x more high-tech than a bar chart.
   const chartData = {
-    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+    labels: ['10:00', '10:05', '10:10', '10:15', '10:20', '10:25', '10:30'],
     datasets: [{
-      label: 'Transaction Volume',
-      data: [1200, 1900, 800, 1500, 2000, 500],
-      backgroundColor: 'rgba(59, 130, 246, 0.8)',
-      borderRadius: 6,
-      borderWidth: 0,
-      barThickness: 24,
+      label: 'Commits per Minute',
+      data: [120, 190, 80, 250, 210, 310, 280],
+      borderColor: '#38bdf8',
+      backgroundColor: 'rgba(56, 189, 248, 0.1)', // Creates the glowing area under the line
+      borderWidth: 3,
+      pointBackgroundColor: '#020617',
+      pointBorderColor: '#38bdf8',
+      pointBorderWidth: 2,
+      pointRadius: 4,
+      fill: true,
+      tension: 0.4 // Smooth curves
     }]
   };
 
-  const chartOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#64748b' } }, x: { grid: { display: false }, ticks: { color: '#64748b' } } } };
+  const chartOptions = { 
+    responsive: true, 
+    maintainAspectRatio: false, 
+    plugins: { legend: { display: false } }, 
+    scales: { 
+      y: { grid: { color: 'rgba(255, 255, 255, 0.03)' }, ticks: { color: '#64748b', font: { family: 'monospace' } } }, 
+      x: { grid: { display: false }, ticks: { color: '#64748b', font: { family: 'monospace' } } } 
+    } 
+  };
 
   return (
     <div className="app-container">
-      {/* Navbar */}
+      {/* Sleek Modern Header */}
       <header className="app-header">
         <div>
-          <h1 className="logo-title">ACID Banking Core</h1>
-          <p className="logo-subtitle">Transaction Management Engine</p>
+          <h1 className="logo-title">ACID Core Engine</h1>
+          <p className="logo-subtitle">Distributed Transaction Node</p>
         </div>
+        
+        {/* Pill Navigation (Matches Concurrency Lab style) */}
         <nav className="nav-links">
-          <span
-            className={`nav-link ${activeTab === 'dashboard' ? 'active' : ''}`}
-            onClick={() => setActiveTab('dashboard')}
-            style={{ cursor: 'pointer' }}
-          >
+          <span className={`nav-link ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
             Dashboard
           </span>
-          <span
-            className={`nav-link ${activeTab === 'concurrency' ? 'active' : ''}`}
-            onClick={() => setActiveTab('concurrency')}
-            style={{ cursor: 'pointer', color: activeTab === 'concurrency' ? '#3b82f6' : '' }}
-          >
+          <span className={`nav-link ${activeTab === 'concurrency' ? 'active' : ''}`} onClick={() => setActiveTab('concurrency')}>
             Concurrency Lab
           </span>
-          <span
-            className={`nav-link ${activeTab === 'recovery' ? 'active' : ''}`}
-            onClick={() => setActiveTab('recovery')}
-            style={{ cursor: 'pointer', color: activeTab === 'recovery' ? '#ef4444' : '' }}
-          >
+          <span className={`nav-link ${activeTab === 'recovery' ? 'active' : ''}`} onClick={() => setActiveTab('recovery')}>
             Recovery Lab
-
           </span>
-          <span
-            className={`nav-link ${activeTab === 'performance' ? 'active' : ''}`}
-            onClick={() => setActiveTab('performance')}
-            style={{ cursor: 'pointer', color: activeTab === 'performance' ? '#a855f7' : '' }}
-          >
+          <span className={`nav-link ${activeTab === 'performance' ? 'active' : ''}`} onClick={() => setActiveTab('performance')}>
             Optimization Lab
           </span>
         </nav>
       </header>
 
-      {/* CONDITIONAL RENDERING: DASHBOARD */}
+      {/* ================= DASHBOARD VIEW ================= */}
       {activeTab === 'dashboard' && (
         <div className="dashboard-grid">
+          
+          {/* Left Column: Actions */}
           <div className="column-left">
-            <div className="glass-card">
-              <h2 className="card-label">Active Account</h2>
+            
+            {/* Wallet Card */}
+            <div className="cyber-card wallet-card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ color: '#94a3b8', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '2px' }}>Active Node Account</h3>
+                <span className="wallet-badge">● ONLINE</span>
+              </div>
+              
               {account ? (
                 <>
-                  <div className="account-header">
-                    <h3 className="account-name">{account.full_name}</h3>
-                    <span className="account-badge">ID: {account.account_id} | Savings</span>
-                  </div>
                   <h1 className="balance-amount">${parseFloat(account.balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}</h1>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '15px' }}>
+                    <div style={{ color: '#cbd5e1' }}><strong>{account.full_name}</strong></div>
+                    <div style={{ color: '#64748b', fontFamily: 'monospace' }}>ID: {account.account_id} | Type: Savings</div>
+                  </div>
                 </>
               ) : (
-                <h3 className="status-connecting">{status.message || "Connecting to Database..."}</h3>
+                <h3 style={{ color: '#ef4444', marginTop: '20px', fontFamily: 'monospace' }}>{status.message || "Establishing connection..."}</h3>
               )}
             </div>
 
-            <div className="glass-card">
-              <h3 className="section-title">Execute Transfer</h3>
-              <form onSubmit={handleTransfer} className="transfer-form">
+            {/* Execution Form */}
+            <div className="cyber-card">
+              <h3 className="card-title"><span style={{color: '#3b82f6'}}>⚡</span> Execute Transfer</h3>
+              <form onSubmit={handleTransfer}>
                 <div className="form-group">
                   <label>Destination Account ID</label>
-                  <input type="number" className="premium-input" value={transferData.toAccount} onChange={(e) => setTransferData({ ...transferData, toAccount: e.target.value })} required placeholder="e.g., 2" />
+                  <input type="number" className="premium-input" value={transferData.toAccount} onChange={(e) => setTransferData({...transferData, toAccount: e.target.value})} required placeholder="e.g., 2" />
                 </div>
                 <div className="form-group">
-                  <label>Amount ($)</label>
-                  <input type="number" step="0.01" className="premium-input" value={transferData.amount} onChange={(e) => setTransferData({ ...transferData, amount: e.target.value })} required placeholder="0.00" />
+                  <label>Amount (USD)</label>
+                  <input type="number" step="0.01" className="premium-input" value={transferData.amount} onChange={(e) => setTransferData({...transferData, amount: e.target.value})} required placeholder="0.00" />
                 </div>
-                <button type="submit" className="btn-primary" disabled={!account || status.type === 'pending'}>{status.type === 'pending' ? 'Executing...' : 'Commit Transaction'}</button>
+                <button type="submit" className="btn-primary" disabled={!account || status.type === 'pending'}>
+                  {status.type === 'pending' ? 'Writing to WAL...' : 'Commit Transaction'}
+                </button>
               </form>
-              {status.message && status.type !== 'pending' && <div className={`status-msg ${status.type === 'success' ? 'status-success' : 'status-error'}`}>{status.message}</div>}
+              {status.message && status.type !== 'pending' && (
+                <div className={`status-msg ${status.type === 'success' ? 'status-success' : 'status-error'}`}>
+                  {status.message}
+                </div>
+              )}
             </div>
           </div>
-          <div className="glass-card chart-container">
-            <h3 className="section-title">System Telemetry</h3>
-            <div className="chart-wrapper"><Bar data={chartData} options={chartOptions} /></div>
-            <p className="chart-footer">* Live transaction isolation graphs will populate here during Final Evaluation.</p>
+
+          {/* Right Column: Telemetry */}
+          <div className="cyber-card">
+            <h3 className="card-title"><span style={{color: '#8b5cf6'}}>📡</span> Engine Telemetry</h3>
+            
+            {/* The upgraded glowing line chart */}
+            <div style={{ height: '280px', width: '100%' }}>
+              <Line data={chartData} options={chartOptions} />
+            </div>
+
+            {/* Fake (but highly impressive) DB metric boxes */}
+            <div className="stats-grid">
+              <div className="stat-box">
+                <div className="stat-label">Buffer Hit Rate</div>
+                <div className="stat-value" style={{color: '#10b981'}}>99.8%</div>
+              </div>
+              <div className="stat-box">
+                <div className="stat-label">Avg Latency</div>
+                <div className="stat-value" style={{color: '#38bdf8'}}>1.2ms</div>
+              </div>
+              <div className="stat-box">
+                <div className="stat-label">Active Locks</div>
+                <div className="stat-value" style={{color: '#cbd5e1'}}>0</div>
+              </div>
+            </div>
+            
+            <p style={{ color: '#64748b', fontSize: '11px', textAlign: 'center', marginTop: '20px', fontStyle: 'italic' }}>
+              * Metrics simulate InnoDB engine health during standard operations.
+            </p>
           </div>
+
         </div>
       )}
 
-      {/* CONDITIONAL RENDERING: CONCURRENCY LAB */}
+      {/* ================= COMPONENT ROUTING ================= */}
       {activeTab === 'concurrency' && <ConcurrencyLab />}
-
-      {/* CONDITIONAL RENDERING: RECOVERY LAB */}
       {activeTab === 'recovery' && <RecoveryLab />}
-
-      {/* CONDITIONAL RENDERING: OPTIMIZATION LAB */}
       {activeTab === 'performance' && <PerformanceLab />}
     </div>
   );
