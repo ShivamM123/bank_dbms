@@ -1,15 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-// Notice the Chart.js imports changed: we added LineElement, PointElement, and Filler
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Title, Tooltip, Legend, Filler } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import ConcurrencyLab from './ConcurrencyLab';
 import RecoveryLab from './RecoveryLab';
 import PerformanceLab from './PerformanceLab';
 import './App.css';
 
-// Register the new Chart components
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Title, Tooltip, Legend, Filler);
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -18,6 +16,18 @@ function App() {
   const [account, setAccount] = useState(null);
   const [transferData, setTransferData] = useState({ toAccount: '', amount: '' });
   const [status, setStatus] = useState({ message: '', type: '' });
+  const [animatedBalance, setAnimatedBalance] = useState(0);
+  const [activeLocks, setActiveLocks] = useState(0);
+  const [txHistory, setTxHistory] = useState([
+    { time: '10:00', c: 120, f: 5  },
+    { time: '10:05', c: 190, f: 12 },
+    { time: '10:10', c: 80,  f: 8  },
+    { time: '10:15', c: 250, f: 3  },
+    { time: '10:20', c: 210, f: 18 },
+    { time: '10:25', c: 310, f: 7  },
+    { time: '10:30', c: 280, f: 10 },
+  ]);
+  const animRef = useRef(null);
 
   // --- DASHBOARD FUNCTIONS ---
   const fetchAccount = async () => {
@@ -34,48 +44,74 @@ function App() {
     if (activeTab === 'dashboard') fetchAccount();
   }, [activeTab]);
 
+  // Animate balance counter on account load
+  useEffect(() => {
+    if (!account) return;
+    const target = parseFloat(account.balance);
+    const start = performance.now();
+    const from = animatedBalance;
+    const animate = (now) => {
+      const p = Math.min((now - start) / 1200, 1);
+      const ease = 1 - Math.pow(1 - p, 3);
+      setAnimatedBalance(from + (target - from) * ease);
+      if (p < 1) animRef.current = requestAnimationFrame(animate);
+    };
+    animRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animRef.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account?.balance]);
+
   const handleTransfer = async (e) => {
     e.preventDefault();
     setStatus({ message: 'Executing ACID Transaction...', type: 'pending' });
+    setActiveLocks(1);
     try {
       await axios.post('http://localhost:5000/api/transfer', {
         fromAccount: 1, toAccount: parseInt(transferData.toAccount), amount: parseFloat(transferData.amount)
       });
       setStatus({ message: 'Transaction Committed Successfully', type: 'success' });
+      const t = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+      setTxHistory(prev => [...prev.slice(-6), { time: t, c: Math.floor(Math.random()*200)+100, f: Math.floor(Math.random()*15) }]);
       fetchAccount();
       setTransferData({ toAccount: '', amount: '' });
     } catch (error) {
       setStatus({ message: error.response?.data?.error || 'Transaction Failed & Rolled Back', type: 'error' });
+    } finally {
+      setActiveLocks(0);
     }
   };
 
-  // --- CYBERPUNK CHART CONFIG ---
-  // Using a line chart with a gradient fill looks 10x more high-tech than a bar chart.
   const chartData = {
-    labels: ['10:00', '10:05', '10:10', '10:15', '10:20', '10:25', '10:30'],
-    datasets: [{
-      label: 'Commits per Minute',
-      data: [120, 190, 80, 250, 210, 310, 280],
-      borderColor: '#38bdf8',
-      backgroundColor: 'rgba(56, 189, 248, 0.1)', // Creates the glowing area under the line
-      borderWidth: 3,
-      pointBackgroundColor: '#020617',
-      pointBorderColor: '#38bdf8',
-      pointBorderWidth: 2,
-      pointRadius: 4,
-      fill: true,
-      tension: 0.4 // Smooth curves
-    }]
+    labels: txHistory.map(t => t.time),
+    datasets: [
+      {
+        label: 'Commits/min',
+        data: txHistory.map(t => t.c),
+        borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,0.08)',
+        borderWidth: 2.5, pointRadius: 3, fill: true, tension: 0.4,
+        pointBackgroundColor: '#020617', pointBorderColor: '#38bdf8', pointBorderWidth: 2,
+      },
+      {
+        label: 'Failures/min',
+        data: txHistory.map(t => t.f),
+        borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.06)',
+        borderWidth: 2, pointRadius: 3, fill: true, tension: 0.4,
+        pointBackgroundColor: '#020617', pointBorderColor: '#ef4444', pointBorderWidth: 2,
+      },
+    ]
   };
 
   const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: true, position: 'top', labels: { color: '#64748b', font: { family: 'monospace', size: 11 }, boxWidth: 10, padding: 12 } },
+      tooltip: { backgroundColor: 'rgba(2,6,23,0.9)', borderColor: '#334155', borderWidth: 1, titleColor: '#f8fafc', bodyColor: '#94a3b8' },
+    },
     scales: {
-      y: { grid: { color: 'rgba(255, 255, 255, 0.03)' }, ticks: { color: '#64748b', font: { family: 'monospace' } } },
-      x: { grid: { display: false }, ticks: { color: '#64748b', font: { family: 'monospace' } } }
-    }
+      y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#64748b', font: { family: 'monospace', size: 10 } } },
+      x: { grid: { display: false }, ticks: { color: '#64748b', font: { family: 'monospace', size: 10 } } },
+    },
   };
 
   return (
@@ -120,7 +156,7 @@ function App() {
 
               {account ? (
                 <>
-                  <h1 className="balance-amount">${parseFloat(account.balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}</h1>
+                  <h1 className="balance-amount">${animatedBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h1>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '15px' }}>
                     <div style={{ color: '#cbd5e1' }}><strong>{account.full_name}</strong></div>
                     <div style={{ color: '#64748b', fontFamily: 'monospace' }}>ID: {account.account_id} | Type: Savings</div>
@@ -143,7 +179,7 @@ function App() {
                   <label>Amount (USD)</label>
                   <input type="number" step="0.01" min="0.01" className="premium-input" value={transferData.amount} onChange={(e) => setTransferData({ ...transferData, amount: e.target.value })} required placeholder="0.00" />                </div>
                 <button type="submit" className="btn-primary" disabled={!account || status.type === 'pending'}>
-                  {status.type === 'pending' ? 'Writing to WAL...' : 'Commit Transaction'}
+                  {status.type === 'pending' ? '⏳ Writing to WAL...' : 'Commit Transaction'}
                 </button>
               </form>
               {status.message && status.type !== 'pending' && (
@@ -164,7 +200,7 @@ function App() {
             </div>
 
             {/* Fake (but highly impressive) DB metric boxes */}
-            <div className="stats-grid">
+            <div className="stats-grid" style={{ marginTop: '20px' }}>
               <div className="stat-box">
                 <div className="stat-label">Buffer Hit Rate</div>
                 <div className="stat-value" style={{ color: '#10b981' }}>99.8%</div>
@@ -173,9 +209,11 @@ function App() {
                 <div className="stat-label">Avg Latency</div>
                 <div className="stat-value" style={{ color: '#38bdf8' }}>1.2ms</div>
               </div>
-              <div className="stat-box">
+              <div className="stat-box" style={{ border: activeLocks > 0 ? '1px solid #f59e0b40' : '1px solid #1e293b', transition: 'border-color 0.3s' }}>
                 <div className="stat-label">Active Locks</div>
-                <div className="stat-value" style={{ color: '#cbd5e1' }}>0</div>
+                <div className="stat-value" style={{ color: activeLocks > 0 ? '#f59e0b' : '#cbd5e1', transition: 'color 0.3s', textShadow: activeLocks > 0 ? '0 0 12px #f59e0b80' : 'none' }}>
+                  {activeLocks}
+                </div>
               </div>
             </div>
 

@@ -4,7 +4,11 @@ import axios from 'axios';
 function ConcurrencyLab() {
     const [scenario, setScenario] = useState('dirty');
     const [isProcessing, setIsProcessing] = useState(false);
-    const [windowOpen, setWindowOpen] = useState(false); // Tracks if Tx A is actively running
+    const [windowOpen, setWindowOpen] = useState(false);
+
+    // Timeline phase tracking: 'idle' | 'running' | 'done' | 'failed'
+    const [txAPhase, setTxAPhase] = useState('idle');
+    const [txBPhase, setTxBPhase] = useState('idle');
 
     // Dirty Read States
     const [txAStatus, setTxAStatus] = useState('Awaiting execution...');
@@ -28,65 +32,112 @@ function ConcurrencyLab() {
 
     // SCENARIO 1: DIRTY READ
     const executeTxA = async () => {
-        setIsProcessing(true); setWindowOpen(true); setTxAStatus('⏳ Holding lock in RAM for 5s...'); setDirtyResult(null);
+        setIsProcessing(true); setWindowOpen(true); setTxAPhase('running'); setTxBPhase('idle');
+        setTxAStatus('⏳ Holding lock in RAM for 5s...'); setDirtyResult(null);
         try {
             await axios.post('http://localhost:5000/api/concurrency/tx-a');
             setTimeout(() => {
-                setTxAStatus('🛑 Rolled Back.');
+                setTxAStatus('🛑 Rolled Back.'); setTxAPhase('failed');
                 setIsProcessing(false); setWindowOpen(false);
             }, 5000);
-        } catch (error) { setTxAStatus('🛑 Error communicating with DB'); setIsProcessing(false); setWindowOpen(false); }
+        } catch (error) { setTxAStatus('🛑 Error communicating with DB'); setTxAPhase('failed'); setIsProcessing(false); setWindowOpen(false); }
     };
 
     const executeTxB = async () => {
-        setTxBStatus('⏳ Fetching...');
-        const isCollision = windowOpen; // Tag the read based on when they clicked
+        setTxBStatus('⏳ Fetching...'); setTxBPhase('running');
+        const isCollision = windowOpen;
         try {
             const res = await axios.get(`http://localhost:5000/api/concurrency/tx-b?isolation=${dirtyIsolation}`);
             setDirtyResult({ balance: res.data.balance, isolation: dirtyIsolation, isCollision });
-            setTxBStatus(`✅ Read complete`);
-        } catch (error) { setTxBStatus('🛑 Error fetching balance'); }
+            setTxBStatus(`✅ Read complete`); setTxBPhase('done');
+        } catch (error) { setTxBStatus('🛑 Error fetching balance'); setTxBPhase('failed'); }
     };
 
     // SCENARIO 2: FUZZY READ
     const executeRepeatA = async () => {
-        setIsProcessing(true); setWindowOpen(true); setRepeatAStatus('⏳ Auditing... (Holding 5s)'); setRepeatResult(null);
+        setIsProcessing(true); setWindowOpen(true); setTxAPhase('running'); setTxBPhase('idle');
+        setRepeatAStatus('⏳ Auditing... (Holding 5s)'); setRepeatResult(null);
         try {
             const res = await axios.get(`http://localhost:5000/api/concurrency/repeat-tx-a?isolation=${repeatIsolation}`);
             setRepeatResult({ ...res.data, isolation: repeatIsolation, isCollision: windowOpen });
-            setRepeatAStatus('✅ Audit Complete.');
-        } catch (error) { setRepeatAStatus('🛑 Error executing Reader Tx'); }
+            setRepeatAStatus('✅ Audit Complete.'); setTxAPhase('done');
+        } catch (error) { setRepeatAStatus('🛑 Error executing Reader Tx'); setTxAPhase('failed'); }
         finally { setIsProcessing(false); setWindowOpen(false); }
     };
 
     const executeRepeatB = async () => {
-        setRepeatBStatus('⏳ Updating database...');
+        setRepeatBStatus('⏳ Updating database...'); setTxBPhase('running');
         try {
             await axios.post('http://localhost:5000/api/concurrency/repeat-tx-b');
-            setRepeatBStatus(`✅ Committed to Disk`);
-            setTimeout(() => setRepeatBStatus('Awaiting execution...'), 10000);
-        } catch (error) { setRepeatBStatus('🛑 Error executing Updater'); }
+            setRepeatBStatus(`✅ Committed to Disk`); setTxBPhase('done');
+            setTimeout(() => { setRepeatBStatus('Awaiting execution...'); setTxBPhase('idle'); }, 10000);
+        } catch (error) { setRepeatBStatus('🛑 Error executing Updater'); setTxBPhase('failed'); }
     };
 
     // SCENARIO 3: PHANTOM READ
     const executePhantomA = async () => {
-        setIsProcessing(true); setWindowOpen(true); setPhantomAStatus('⏳ Counting rows... (Holding 5s)'); setPhantomResult(null);
+        setIsProcessing(true); setWindowOpen(true); setTxAPhase('running'); setTxBPhase('idle');
+        setPhantomAStatus('⏳ Counting rows... (Holding 5s)'); setPhantomResult(null);
         try {
             const res = await axios.get(`http://localhost:5000/api/concurrency/phantom-tx-a?isolation=${phantomIsolation}`);
             setPhantomResult({ ...res.data, isolation: phantomIsolation, isCollision: windowOpen });
-            setPhantomAStatus('✅ Audit Complete.');
-        } catch (error) { setPhantomAStatus('🛑 Error executing Auditor'); }
+            setPhantomAStatus('✅ Audit Complete.'); setTxAPhase('done');
+        } catch (error) { setPhantomAStatus('🛑 Error executing Auditor'); setTxAPhase('failed'); }
         finally { setIsProcessing(false); setWindowOpen(false); }
     };
 
     const executePhantomB = async () => {
-        setPhantomBStatus('⏳ Inserting row...');
+        setPhantomBStatus('⏳ Inserting row...'); setTxBPhase('running');
         try {
             await axios.post('http://localhost:5000/api/concurrency/phantom-tx-b');
-            setPhantomBStatus(`✅ Row Inserted Successfully`);
-            setTimeout(() => setPhantomBStatus('Awaiting execution...'), 10000);
-        } catch (error) { setPhantomBStatus('🛑 Blocked by Range Lock!'); }
+            setPhantomBStatus(`✅ Row Inserted Successfully`); setTxBPhase('done');
+            setTimeout(() => { setPhantomBStatus('Awaiting execution...'); setTxBPhase('idle'); }, 10000);
+        } catch (error) { setPhantomBStatus('🛑 Blocked by Range Lock!'); setTxBPhase('failed'); }
     };
+
+    // ── New Visual Sub-components ────────────────────────────────────────────
+    const TIERS = [
+        { key: 'READ UNCOMMITTED', short: 'Tier 1', risk: 'UNSAFE',  color: '#ef4444' },
+        { key: 'READ COMMITTED',   short: 'Tier 2', risk: 'MEDIUM',  color: '#f59e0b' },
+        { key: 'REPEATABLE READ',  short: 'Tier 3', risk: 'SAFE',    color: '#14b8a6' },
+        { key: 'SERIALIZABLE',     short: 'Tier 4', risk: 'STRICT',  color: '#10b981' },
+    ];
+
+    const IsolationGauge = ({ active }) => (
+        <div style={{ display: 'flex', gap: '6px', marginBottom: '22px' }}>
+            {TIERS.map(t => {
+                const on = t.key === active;
+                return (
+                    <div key={t.key} style={{ flex: 1, padding: '8px 4px', borderRadius: '8px', textAlign: 'center',
+                        background: on ? `${t.color}20` : 'rgba(15,23,42,0.6)',
+                        border: `1px solid ${on ? t.color : '#1e293b'}`, transition: 'all 0.3s' }}>
+                        <div style={{ fontSize: '9px', color: on ? t.color : '#334155', fontWeight: '800', letterSpacing: '1px' }}>{t.risk}</div>
+                        <div style={{ fontSize: '10px', color: on ? '#f8fafc' : '#475569', marginTop: '2px', fontFamily: 'monospace' }}>{t.short}</div>
+                    </div>
+                );
+            })}
+        </div>
+    );
+
+    const phaseColor = { idle: '#1e293b', running: '#f59e0b', done: '#10b981', failed: '#ef4444' };
+    const phaseLabel = { idle: 'idle', running: 'active ⟳', done: 'committed ✓', failed: 'rolled back ✗' };
+    const TransactionTimeline = () => (
+        <div style={{ background: '#020617', borderRadius: '12px', padding: '16px 20px', border: '1px solid #1e293b', marginBottom: '20px' }}>
+            <div style={{ fontSize: '10px', color: '#475569', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px', fontWeight: '700' }}>Live Transaction Timeline</div>
+            {[{ label: 'Tx A', phase: txAPhase }, { label: 'Tx B', phase: txBPhase }].map(tx => (
+                <div key={tx.label} style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                    <span style={{ color: '#64748b', fontSize: '12px', fontFamily: 'monospace', width: '30px', flexShrink: 0 }}>{tx.label}</span>
+                    <div style={{ flex: 1, height: '20px', background: '#0f172a', borderRadius: '6px', overflow: 'hidden', border: '1px solid #1e293b' }}>
+                        <div style={{ height: '100%', width: tx.phase === 'idle' ? '0%' : tx.phase === 'running' ? '60%' : '100%',
+                            background: phaseColor[tx.phase], borderRadius: '6px',
+                            transition: 'width 0.8s ease, background 0.4s ease',
+                            boxShadow: tx.phase === 'running' ? `0 0 8px ${phaseColor[tx.phase]}80` : 'none' }} />
+                    </div>
+                    <span style={{ color: phaseColor[tx.phase], fontSize: '10px', fontFamily: 'monospace', width: '90px', flexShrink: 0, textAlign: 'right' }}>{phaseLabel[tx.phase]}</span>
+                </div>
+            ))}
+        </div>
+    );
 
     // --- REUSABLE UI COMPONENTS ---
     const NavButton = ({ id, label, activeColor }) => {
@@ -162,6 +213,8 @@ function ConcurrencyLab() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
                         <TheoryBanner color="#3b82f6" title="Scenario 1: The Dirty Read" text="A Dirty Read occurs when Transaction B is allowed to read uncommitted data from Transaction A's RAM. If Transaction A crashes or rolls back, Transaction B has just made a decision based on fake data." />
+                        <IsolationGauge active={dirtyIsolation} />
+                        <TransactionTimeline />
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '25px' }}>
                             <div style={{ background: 'rgba(15,23,42,0.8)', borderRadius: '16px', border: '1px solid rgba(51,65,85,0.6)', padding: '25px', position: 'relative', overflow: 'hidden' }}>
@@ -225,6 +278,8 @@ function ConcurrencyLab() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
                         <TheoryBanner color="#14b8a6" title="Scenario 2: The Fuzzy Read" text="A Fuzzy (Non-Repeatable) Read happens when Transaction A reads a row, but before it finishes its work, Transaction B alters that row and permanently commits it. When A reads the row a second time, the data has mutated mid-transaction." />
+                        <IsolationGauge active={repeatIsolation} />
+                        <TransactionTimeline />
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '25px' }}>
                             <div style={{ background: 'rgba(15,23,42,0.8)', borderRadius: '16px', border: '1px solid rgba(51,65,85,0.6)', padding: '25px', position: 'relative', overflow: 'hidden' }}>
@@ -258,6 +313,14 @@ function ConcurrencyLab() {
 
                         {repeatResult && (
                             <div style={{ background: '#020617', borderRadius: '16px', border: `1px solid ${repeatResult.read1 !== repeatResult.read2 ? '#ef444450' : '#10b98150'}`, padding: '25px' }}>
+                                {repeatResult.read1 !== repeatResult.read2 && (
+                                    <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+                                        <span style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '1px' }}>Value Delta</span>
+                                        <div style={{ fontSize: '36px', fontWeight: '900', fontFamily: 'monospace', color: '#ef4444', textShadow: '0 0 20px #ef444460' }}>
+                                            −${Math.abs(parseFloat(repeatResult.read1) - parseFloat(repeatResult.read2)).toLocaleString()}
+                                        </div>
+                                    </div>
+                                )}
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', marginBottom: '20px' }}>
                                     <div style={{ textAlign: 'center' }}>
                                         <span style={{ color: '#64748b', fontSize: '12px', fontWeight: 'bold', letterSpacing: '1px', textTransform: 'uppercase' }}>Read 1 (Start)</span>
@@ -286,6 +349,8 @@ function ConcurrencyLab() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
                         <TheoryBanner color="#8b5cf6" title="Scenario 3: The Phantom Read" text="A Phantom Read occurs when Transaction A counts multiple rows (e.g., total active accounts). Before it finishes, Transaction B inserts a brand new row. Transaction A counts again, and a 'Phantom' record has materialized out of nowhere." />
+                        <IsolationGauge active={phantomIsolation} />
+                        <TransactionTimeline />
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '25px' }}>
                             <div style={{ background: 'rgba(15,23,42,0.8)', borderRadius: '16px', border: '1px solid rgba(51,65,85,0.6)', padding: '25px', position: 'relative', overflow: 'hidden' }}>
@@ -319,6 +384,14 @@ function ConcurrencyLab() {
 
                         {phantomResult && (
                             <div style={{ background: '#020617', borderRadius: '16px', border: `1px solid ${phantomResult.count1 !== phantomResult.count2 ? '#ef444450' : '#10b98150'}`, padding: '25px' }}>
+                                {phantomResult.count1 !== phantomResult.count2 && (
+                                    <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+                                        <span style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '1px' }}>Phantom Rows Injected</span>
+                                        <div style={{ fontSize: '36px', fontWeight: '900', fontFamily: 'monospace', color: '#ec4899', textShadow: '0 0 20px #ec489960' }}>
+                                            +{Math.abs(parseInt(phantomResult.count2) - parseInt(phantomResult.count1))} 👻
+                                        </div>
+                                    </div>
+                                )}
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', marginBottom: '20px' }}>
                                     <div style={{ textAlign: 'center' }}>
                                         <span style={{ color: '#64748b', fontSize: '12px', fontWeight: 'bold', letterSpacing: '1px', textTransform: 'uppercase' }}>Count 1 (Start)</span>
