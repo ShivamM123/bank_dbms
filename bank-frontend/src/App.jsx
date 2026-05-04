@@ -1,11 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 import ConcurrencyLab from './ConcurrencyLab'; // Importing your new lab
 import './App.css';
 import RecoveryLab from './RecoveryLab';
-import './RecoveryLab.css';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -17,12 +16,6 @@ function App() {
   const [account, setAccount] = useState(null);
   const [transferData, setTransferData] = useState({ toAccount: '', amount: '' });
   const [status, setStatus] = useState({ message: '', type: '' });
-
-  // Recovery Lab States
-  const [crashStatus, setCrashStatus] = useState('Idle. Ready for test.');
-  const [countdown, setCountdown] = useState(0);
-  const [ramData, setRamData] = useState(null);
-  const timerRef = useRef(null);
 
   // --- DASHBOARD FUNCTIONS ---
   const fetchAccount = async () => {
@@ -51,61 +44,6 @@ function App() {
       setTransferData({ toAccount: '', amount: '' });
     } catch (error) {
       setStatus({ message: error.response?.data?.error || 'Transaction Failed & Rolled Back', type: 'error' });
-    }
-  };
-
-  // --- RECOVERY LAB FUNCTIONS ---
-  const fetchRamData = async () => {
-    try {
-      const res = await axios.get('http://localhost:5000/api/crash-lab/monitor');
-      setRamData(res.data);
-    } catch (error) {
-      setRamData(null);
-    }
-  };
-
-  const startSlowTransaction = async () => {
-    setCrashStatus('Transaction floating in RAM (Uncommitted)');
-    setCountdown(15);
-    setRamData(null);
-
-    if (timerRef.current) clearInterval(timerRef.current);
-    timerRef.current = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) clearInterval(timerRef.current);
-        return prev - 1;
-      });
-    }, 1000);
-
-    try {
-      axios.post('http://localhost:5000/api/crash-lab/start-transfer');
-      setTimeout(fetchRamData, 1000);
-    } catch (error) {
-      setCrashStatus('Error: Docker DB offline.');
-    }
-  };
-
-  const executeKill = async () => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    setCountdown(0);
-    setCrashStatus('TRANSMITTING KILL COMMAND...');
-    try {
-      const res = await axios.post('http://localhost:5000/api/crash-lab/kill');
-      setCrashStatus(res.data.message);
-      setRamData(null);
-    } catch (error) {
-      setCrashStatus('Error: Failed to kill container.');
-    }
-  };
-
-  const executeRecover = async () => {
-    setCrashStatus('Rebooting Database...');
-    try {
-      const res = await axios.post('http://localhost:5000/api/crash-lab/recover');
-      setCrashStatus(res.data.message);
-      fetchRamData();
-    } catch (error) {
-      setCrashStatus('Error: Failed to reboot database.');
     }
   };
 
@@ -204,46 +142,7 @@ function App() {
       {activeTab === 'concurrency' && <ConcurrencyLab />}
 
       {/* CONDITIONAL RENDERING: RECOVERY LAB */}
-      {activeTab === 'recovery' && (
-        <div className="glass-card" style={{ padding: '40px', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
-          <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-            <h2 style={{ color: '#ef4444', fontSize: '32px', marginBottom: '10px' }}>💥 Atomicity & Crash Recovery</h2>
-            <p style={{ color: '#94a3b8', fontSize: '16px' }}>Watch the $500k float in the Buffer Pool (RAM) before being committed to the Redo Log (Disk).</p>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '20px', marginBottom: '40px' }}>
-            <div style={{ flex: 1, padding: '20px', backgroundColor: '#0f172a', borderRadius: '8px', border: '1px solid #3b82f6', textAlign: 'center' }}>
-              <h3 style={{ color: '#38bdf8', marginBottom: '15px' }}>Live RAM Monitor</h3>
-              {countdown > 0 && <p style={{ color: '#f59e0b', fontSize: '24px', fontWeight: 'bold', marginBottom: '10px' }}>⏳ COMMIT IN: {countdown}s</p>}
-              {ramData ? (
-                <div>
-                  <p style={{ color: '#fff', fontSize: '18px' }}>Receiver (ID 1): <span style={{ color: '#22c55e' }}>${parseFloat(ramData.find(r => r.account_id === 1)?.balance || 0).toLocaleString()}</span></p>
-                  <p style={{ color: '#fff', fontSize: '18px' }}>Sender (ID 3): <span style={{ color: '#ef4444' }}>${parseFloat(ramData.find(r => r.account_id === 3)?.balance || 0).toLocaleString()}</span></p>
-                </div>
-              ) : (
-                <p style={{ color: '#64748b' }}>Waiting for transaction...</p>
-              )}
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', flexWrap: 'wrap', marginBottom: '30px' }}>
-            <button onClick={startSlowTransaction} disabled={countdown > 0} style={{ padding: '15px 25px', backgroundColor: countdown > 0 ? '#475569' : '#f59e0b', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: countdown > 0 ? 'not-allowed' : 'pointer' }}>
-              1. Start $500k Transfer
-            </button>
-            <button onClick={executeKill} style={{ padding: '15px 25px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 0 15px rgba(239,68,68,0.5)' }}>
-              2. ⚡ PULL THE PLUG
-            </button>
-            <button onClick={executeRecover} style={{ padding: '15px 25px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>
-              3. Reboot DB (Check Rollback)
-            </button>
-          </div>
-
-          <div style={{ backgroundColor: '#0f172a', padding: '15px', borderRadius: '8px', border: '1px solid #334155', fontFamily: 'monospace', color: '#fff', textAlign: 'center' }}>
-            <span style={{ color: '#38bdf8' }}>Status: </span>
-            <span style={{ color: crashStatus.includes('DEAD') || crashStatus.includes('Error') ? '#ef4444' : '#22c55e' }}>{crashStatus}</span>
-          </div>
-        </div>
-      )}
+      {activeTab === 'recovery' && <RecoveryLab />}
     </div>
   );
 }
