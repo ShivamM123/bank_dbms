@@ -5,12 +5,12 @@ import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Toolti
 import ConcurrencyLab from './ConcurrencyLab'; // Importing your new lab
 import './App.css';
 import RecoveryLab from './RecoveryLab';
-
+import PerformanceLab from './PerfomanceLab';
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 function App() {
   // Navigation State
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'concurrency', or 'recovery'
+  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'concurrency', or 'recovery', and query
 
   // Dashboard States
   const [account, setAccount] = useState(null);
@@ -91,6 +91,14 @@ function App() {
             style={{ cursor: 'pointer', color: activeTab === 'recovery' ? '#ef4444' : '' }}
           >
             Recovery Lab
+
+          </span>
+          <span
+            className={`nav-link ${activeTab === 'performance' ? 'active' : ''}`}
+            onClick={() => setActiveTab('performance')}
+            style={{ cursor: 'pointer', color: activeTab === 'performance' ? '#a855f7' : '' }}
+          >
+            Optimization Lab
           </span>
         </nav>
       </header>
@@ -143,6 +151,9 @@ function App() {
 
       {/* CONDITIONAL RENDERING: RECOVERY LAB */}
       {activeTab === 'recovery' && <RecoveryLab />}
+
+      {/* CONDITIONAL RENDERING: OPTIMIZATION LAB */}
+      {activeTab === 'performance' && <PerformanceLab />}
     </div>
   );
 }

@@ -253,6 +253,56 @@ app.post('/api/concurrency/repeat-tx-b', async (req, res) => {
         res.status(500).json({ error: 'Tx B failed' });
     }
 });
+// ==========================================
+// 🚀 QUERY OPTIMIZATION LAB (INDEXING)
+// ==========================================
+
+// 1. Run EXPLAIN and measure actual backend execution time
+app.get('/api/optimization/analyze', async (req, res) => {
+    try {
+        // We added a dynamic RAND() condition to defeat the RAM cache and force a heavy read
+        const query = `SELECT COUNT(*) FROM Transactions WHERE status = 'Failed' AND amount >= 0 AND RAND() >= 0`;
+
+        const [explainRows] = await pool.query(`EXPLAIN ${query}`);
+
+        const start = performance.now();
+        await pool.query(query);
+        const end = performance.now();
+
+        const executionTimeMs = (end - start).toFixed(2);
+
+        res.json({
+            explain: explainRows[0],
+            actualTimeMs: executionTimeMs
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to analyze query' });
+    }
+});
+// 2. Create the B-Tree Index
+app.post('/api/optimization/add-index', async (req, res) => {
+    try {
+        await pool.query(`CREATE INDEX idx_status ON Transactions(status)`);
+        res.json({ message: 'B-Tree Index created on Transactions(status)' });
+    } catch (error) {
+        // Ignore error if index already exists
+        if (error.code === 'ER_DUP_KEYNAME') {
+            res.json({ message: 'Index already exists.' });
+        } else {
+            res.status(500).json({ error: 'Failed to create index' });
+        }
+    }
+});
+
+// 3. Drop the Index (Reset the lab)
+app.post('/api/optimization/remove-index', async (req, res) => {
+    try {
+        await pool.query(`DROP INDEX idx_status ON Transactions`);
+        res.json({ message: 'Index dropped. Table reverted to Full Scan mode.' });
+    } catch (error) {
+        res.json({ message: 'Index does not exist or already dropped.' });
+    }
+});
 // Start the Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
