@@ -5,51 +5,45 @@
 ![MySQL](https://img.shields.io/badge/Database-MySQL_InnoDB-4479A1?style=for-the-badge&logo=mysql&logoColor=white)
 ![Docker](https://img.shields.io/badge/Infra-Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 
-An advanced, interactive Database Management System (DBMS) simulator designed to visualize and test real-time data collisions, Multi-Version Concurrency Control (MVCC), transaction atomicity, and B-Tree query optimization.
+</div>
 
 ---
 
-## 👥 Meet the Team
+## 📌 Project Overview
+The **ACID Banking Simulation Engine** is not just a standard CRUD application; it is an educational tool designed to visualize and test the deep mechanics of Relational Database Management Systems. Built with a Node.js/Express backend and a React dashboard, this system acts as a sandbox to interact with a highly structured, BCNF-normalized MySQL 8.0 (InnoDB) database.
 
-Developed by Information Technology students at the **Indian Institute of Information Technology, Allahabad (IIITA)**.
-
-| Developer | Roll Number |
-| :--- | :--- |
-| **Shivam Mishra** | IIT2024215 |
-| **Ayush Anand** | IIT2024246 |
-| **Neel Ghule** | IIT2024267 |
-| **Adabala Sridhar** | IIT2024218 |
-| **Bendram Anjan Shiva Reddy** | IIT2024265 |
+### 🎓 Academic Context
+**Developers:** -Shivam Mishra (Roll No: IIT2024215)  
+                -Ayush Anand (Roll No: IIT2024246)
+                -Neel Ghule (Roll No: IIT2024267)
+                -Adabala Sridhar (Roll No: IIT2024218)
+                -Anjan Shivareddy (Roll No: IIT2024   )
+**Program:** Information Technology  
+**Institution:** Indian Institute of Information Technology, Allahabad (IIITA)
 
 ---
 
-## 📖 Project Overview
+## ✨ Core Features & Lab Modules
 
-The **ACID Core Engine** is not just a banking application; it is an educational telemetry dashboard that exposes the internal mechanics of the MySQL InnoDB storage engine. 
+### 1. 🛡️ The ACID Vault (Core Banking)
+- **Atomicity & Consistency:** Utilizes MySQL **Stored Procedures** with custom exception handlers to guarantee that multi-step financial transfers either succeed entirely or roll back cleanly.
+- **Isolation & Durability:** Strictly enforced via the InnoDB engine.
 
-While most academic projects stop at CRUD operations, this project forces the database into highly volatile states (race conditions, mid-transaction mutations, heavy I/O scans) and provides a visual interface to see exactly how the engine resolves these anomalies using isolation tiers and structural optimizations.
+### 2. 🚦 Concurrency Lab (Isolation Levels)
+A dedicated UI module to simulate multiple users accessing the same account simultaneously. It visualizes the anomalies prevented by MySQL's four Transaction Isolation Levels:
+- **Read Uncommitted:** Visualizes Dirty Reads.
+- **Read Committed:** Demonstrates prevention of Dirty Reads, but allows Non-Repeatable Reads.
+- **Repeatable Read (Default):** Prevents Non-Repeatable Reads; uses Next-Key locks to minimize Phantom Reads.
+- **Serializable:** Enforces strict sequential execution.
 
-### 🌟 Core Modules
+### 3. 💥 Crash Recovery Lab
+- Simulates sudden server death mid-transaction using **Docker**.
+- Proves InnoDB's **Redo Log** capabilities by recovering partially written data and strictly applying the Write-Ahead Logging (WAL) protocol upon container restart.
 
-#### 1. 🛡️ The Dashboard (Defensive Engineering)
-A high-performance digital wallet that executes ACID-compliant transfers. 
-* **Strict Business Logic:** Protected against infinite-money glitches (negative transfers) and self-transfer loop exploits via Database-level Stored Procedures.
-* **Engine Telemetry:** Live visualization of commit rates and simulated hardware metrics.
-
-#### 2. 🚦 The Concurrency Lab (MVCC Simulator)
-A live testing environment that pits two transactions against each other to demonstrate ANSI SQL Read Anomalies and how to prevent them:
-* **The Dirty Read:** Demonstrates the danger of `READ UNCOMMITTED` allowing access to volatile RAM, and how `READ COMMITTED` uses the Undo-Log for safety.
-* **The Fuzzy Read:** Shows data mutating mid-transaction, and how `REPEATABLE READ` locks a consistent historical snapshot.
-* **The Phantom Read:** Proves that row-level locks cannot stop `INSERT` statements, requiring the aggressive Range/Gap locks of the `SERIALIZABLE` tier.
-
-#### 3. 💥 The Recovery Lab (Atomicity & WAL)
-Demonstrates the "All-or-Nothing" principle of the ACID acronym. Simulates database crashes during mid-flight transactions to prove that the database utilizes Write-Ahead Logging (WAL) to restore data to a pristine state upon reboot.
-
-#### 4. 🚀 The Optimization Lab (B-Tree Indexing)
-An execution profiler operating on 100,000+ rows of data.
-* Proves the mathematical difference between an O(N) **Full Table Scan** and an O(log N) **B-Tree Index Scan**.
-* Uses Node.js `performance.now()` to measure true server latency.
-* Parses and displays the MySQL engine's internal `EXPLAIN` execution strategy to the user.
+### 4. ⚡ Query Optimization Lab
+- Demonstrates the performance disparity between full table scans and optimized queries.
+- Utilizes **B-Tree & Composite Indexing** on transaction audit trails.
+- Visualizes execution plans using `EXPLAIN ANALYZE` on a seeded dataset of 100,000+ records.
 
 ---
 
@@ -105,14 +99,15 @@ cd bank-frontend
 npm install
 npm run dev
 
-# Access the application at http://localhost:5173
-```
+📖 Key SQL Concepts Demonstrated
+START TRANSACTION, COMMIT, ROLLBACK
 
----
+SELECT ... FOR UPDATE (Row-level locking)
 
-## 📚 Key SQL Concepts Demonstrated
-* `START TRANSACTION`, `COMMIT`, `ROLLBACK`
-* Pessimistic Locking: `SELECT ... FOR UPDATE`
-* **MVCC Internals**: Read View Management, Undo-Log Reconstruction, and Gap Locking.
-* Performance: `EXPLAIN ANALYZE`, B-Tree Indexing, and Query Planning.
-* Database Design: BCNF Normalization, Foreign Key Integrity, and Stored Procedures.
+SET TRANSACTION ISOLATION LEVEL
+
+EXPLAIN ANALYZE
+
+Trigger and Stored Procedure creation (DELIMITER)
+
+Foreign Key Constraints (ON DELETE RESTRICT)
