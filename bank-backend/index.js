@@ -279,7 +279,7 @@ app.post('/api/concurrency/repeat-tx-b', async (req, res) => {
 app.get('/api/optimization/analyze', async (req, res) => {
     try {
         // We added a dynamic RAND() condition to defeat the RAM cache and force a heavy read
-        const query = `SELECT COUNT(*) FROM Transactions WHERE status = 'Failed' AND amount >= 0 AND RAND() >= 0`;
+        const query = `SELECT COUNT(*) FROM Transactions WHERE status = 'Failed' AND RAND() >= 0`;
 
         const [explainRows] = await pool.query(`EXPLAIN ${query}`);
 
