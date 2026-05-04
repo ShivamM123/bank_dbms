@@ -4,6 +4,7 @@ import axios from 'axios';
 function ConcurrencyLab() {
     const [scenario, setScenario] = useState('dirty');
     const [isProcessing, setIsProcessing] = useState(false);
+    const [windowOpen, setWindowOpen] = useState(false); // Tracks if Tx A is actively running
 
     // Dirty Read States
     const [txAStatus, setTxAStatus] = useState('Awaiting execution...');
@@ -24,43 +25,67 @@ function ConcurrencyLab() {
     const [phantomIsolation, setPhantomIsolation] = useState('READ COMMITTED');
 
     // --- API LOGIC ---
+
+    // SCENARIO 1: DIRTY READ
     const executeTxA = async () => {
-        setIsProcessing(true); setTxAStatus('⏳ Holding lock in RAM for 5s...'); setDirtyResult(null);
-        try { await axios.post('http://localhost:5000/api/concurrency/tx-a'); setTimeout(() => { setTxAStatus('🛑 Rolled Back.'); setIsProcessing(false); }, 5000); }
-        catch (error) { setTxAStatus('🛑 Error communicating with DB'); setIsProcessing(false); }
+        setIsProcessing(true); setWindowOpen(true); setTxAStatus('⏳ Holding lock in RAM for 5s...'); setDirtyResult(null);
+        try {
+            await axios.post('http://localhost:5000/api/concurrency/tx-a');
+            setTimeout(() => {
+                setTxAStatus('🛑 Rolled Back.');
+                setIsProcessing(false); setWindowOpen(false);
+            }, 5000);
+        } catch (error) { setTxAStatus('🛑 Error communicating with DB'); setIsProcessing(false); setWindowOpen(false); }
     };
+
     const executeTxB = async () => {
         setTxBStatus('⏳ Fetching...');
+        const isCollision = windowOpen; // Tag the read based on when they clicked
         try {
             const res = await axios.get(`http://localhost:5000/api/concurrency/tx-b?isolation=${dirtyIsolation}`);
-            setDirtyResult({ balance: res.data.balance, isolation: dirtyIsolation }); setTxBStatus(`✅ Read complete`);
+            setDirtyResult({ balance: res.data.balance, isolation: dirtyIsolation, isCollision });
+            setTxBStatus(`✅ Read complete`);
         } catch (error) { setTxBStatus('🛑 Error fetching balance'); }
     };
 
+    // SCENARIO 2: FUZZY READ
     const executeRepeatA = async () => {
-        setIsProcessing(true); setRepeatAStatus('⏳ Auditing... (Holding 5s)'); setRepeatResult(null);
+        setIsProcessing(true); setWindowOpen(true); setRepeatAStatus('⏳ Auditing... (Holding 5s)'); setRepeatResult(null);
         try {
             const res = await axios.get(`http://localhost:5000/api/concurrency/repeat-tx-a?isolation=${repeatIsolation}`);
-            setRepeatResult({ ...res.data, isolation: repeatIsolation }); setRepeatAStatus('✅ Audit Complete.'); setIsProcessing(false);
-        } catch (error) { setRepeatAStatus('🛑 Error executing Reader Tx'); setIsProcessing(false); }
-    };
-    const executeRepeatB = async () => {
-        setRepeatBStatus('⏳ Updating database...');
-        try { await axios.post('http://localhost:5000/api/concurrency/repeat-tx-b'); setRepeatBStatus(`✅ Committed to Disk`); setTimeout(() => setRepeatBStatus('Awaiting execution...'), 10000); }
-        catch (error) { setRepeatBStatus('🛑 Error executing Updater'); }
+            setRepeatResult({ ...res.data, isolation: repeatIsolation, isCollision: windowOpen });
+            setRepeatAStatus('✅ Audit Complete.');
+        } catch (error) { setRepeatAStatus('🛑 Error executing Reader Tx'); }
+        finally { setIsProcessing(false); setWindowOpen(false); }
     };
 
+    const executeRepeatB = async () => {
+        setRepeatBStatus('⏳ Updating database...');
+        try {
+            await axios.post('http://localhost:5000/api/concurrency/repeat-tx-b');
+            setRepeatBStatus(`✅ Committed to Disk`);
+            setTimeout(() => setRepeatBStatus('Awaiting execution...'), 10000);
+        } catch (error) { setRepeatBStatus('🛑 Error executing Updater'); }
+    };
+
+    // SCENARIO 3: PHANTOM READ
     const executePhantomA = async () => {
-        setIsProcessing(true); setPhantomAStatus('⏳ Counting rows... (Holding 5s)'); setPhantomResult(null);
+        setIsProcessing(true); setWindowOpen(true); setPhantomAStatus('⏳ Counting rows... (Holding 5s)'); setPhantomResult(null);
         try {
             const res = await axios.get(`http://localhost:5000/api/concurrency/phantom-tx-a?isolation=${phantomIsolation}`);
-            setPhantomResult({ ...res.data, isolation: phantomIsolation }); setPhantomAStatus('✅ Audit Complete.'); setIsProcessing(false);
-        } catch (error) { setPhantomAStatus('🛑 Error executing Auditor'); setIsProcessing(false); }
+            setPhantomResult({ ...res.data, isolation: phantomIsolation, isCollision: windowOpen });
+            setPhantomAStatus('✅ Audit Complete.');
+        } catch (error) { setPhantomAStatus('🛑 Error executing Auditor'); }
+        finally { setIsProcessing(false); setWindowOpen(false); }
     };
+
     const executePhantomB = async () => {
         setPhantomBStatus('⏳ Inserting row...');
-        try { await axios.post('http://localhost:5000/api/concurrency/phantom-tx-b'); setPhantomBStatus(`✅ Row Inserted Successfully`); setTimeout(() => setPhantomBStatus('Awaiting execution...'), 10000); }
-        catch (error) { setPhantomBStatus('🛑 Blocked by Range Lock!'); }
+        try {
+            await axios.post('http://localhost:5000/api/concurrency/phantom-tx-b');
+            setPhantomBStatus(`✅ Row Inserted Successfully`);
+            setTimeout(() => setPhantomBStatus('Awaiting execution...'), 10000);
+        } catch (error) { setPhantomBStatus('🛑 Blocked by Range Lock!'); }
     };
 
     // --- REUSABLE UI COMPONENTS ---
@@ -87,7 +112,7 @@ function ConcurrencyLab() {
     );
 
     const LiveTerminal = ({ status }) => {
-        let textColor = '#38bdf8'; // Blue Default
+        let textColor = '#38bdf8';
         if (status.includes('🛑') || status.includes('Error')) textColor = '#ef4444';
         else if (status.includes('✅')) textColor = '#10b981';
         else if (status.includes('⏳')) textColor = '#f59e0b';
@@ -163,24 +188,35 @@ function ConcurrencyLab() {
                                         <option value="READ COMMITTED">Tier 2: READ COMMITTED (Protected)</option>
                                     </select>
                                 </div>
+                                {/* REMOVED disabled constraint so you can click before AND after! */}
                                 <ActionButton onClick={executeTxB} label="Fetch Live Balance" colorHex="#3b82f6" icon="📡" />
                                 <LiveTerminal status={txBStatus} />
                             </div>
                         </div>
 
-                        <div style={{ background: '#020617', borderRadius: '16px', border: `1px solid ${dirtyResult?.balance === '4000.00' ? '#ef444450' : dirtyResult?.balance === '5000.00' ? '#10b98150' : '#1e293b'}`, padding: '25px', textAlign: 'center' }}>
-                            <span style={{ color: '#64748b', fontSize: '12px', fontWeight: 'bold', letterSpacing: '2px', textTransform: 'uppercase' }}>Memory Snapshot Retrieved</span>
-                            <div style={{ fontSize: '48px', fontWeight: '900', fontFamily: 'monospace', margin: '10px 0', color: dirtyResult?.balance === '4000.00' ? '#ef4444' : dirtyResult?.balance === '5000.00' ? '#10b981' : '#334155' }}>
-                                {dirtyResult ? `$${dirtyResult.balance}` : 'WAITING FOR DATA'}
-                            </div>
+                        {dirtyResult && (
+                            <div style={{ background: '#020617', borderRadius: '16px', border: `1px solid ${dirtyResult.balance === '4000.00' && dirtyResult.isCollision ? '#ef444450' : '#1e293b'}`, padding: '25px', textAlign: 'center' }}>
 
-                            {dirtyResult?.isolation === 'READ UNCOMMITTED' && (
-                                <EngineAnalysis type="danger" title="Direct Buffer Pool Access" explanation="Because you selected READ UNCOMMITTED, the database engine bypassed all safety locks. It read directly from the volatile Buffer Pool (RAM), retrieving Tx A's uncommitted math. Since Tx A rolled back, Tx B just made a decision based on data that mathematically never existed." />
-                            )}
-                            {dirtyResult?.isolation === 'READ COMMITTED' && (
-                                <EngineAnalysis type="success" title="Undo-Log Reconstruction" explanation="Because you selected READ COMMITTED, the Multi-Version Concurrency Control (MVCC) engine detected Tx A's exclusive lock. Instead of forcing you to wait, it intelligently routed your query to the Undo-Log to seamlessly reconstruct the last pristine, committed snapshot of the data." />
-                            )}
-                        </div>
+                                {/* Temporal Labeling */}
+                                <span style={{ color: dirtyResult.isCollision ? '#f59e0b' : '#10b981', fontSize: '12px', fontWeight: 'bold', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                                    Memory Snapshot: {dirtyResult.isCollision ? 'Mid-Transaction Collision' : 'Stable Post-Rollback State'}
+                                </span>
+
+                                <div style={{ fontSize: '48px', fontWeight: '900', fontFamily: 'monospace', margin: '10px 0', color: dirtyResult.balance === '4000.00' && dirtyResult.isCollision ? '#ef4444' : '#f8fafc' }}>
+                                    ${dirtyResult.balance}
+                                </div>
+
+                                {dirtyResult.isolation === 'READ UNCOMMITTED' && dirtyResult.isCollision && (
+                                    <EngineAnalysis type="danger" title="Direct Buffer Pool Access" explanation="Because you selected READ UNCOMMITTED, the database engine bypassed all safety locks. It read directly from the volatile Buffer Pool (RAM), retrieving Tx A's uncommitted math. Since Tx A rolled back, Tx B just made a decision based on data that mathematically never existed." />
+                                )}
+                                {dirtyResult.isolation === 'READ COMMITTED' && dirtyResult.isCollision && (
+                                    <EngineAnalysis type="success" title="Undo-Log Reconstruction" explanation="Because you selected READ COMMITTED, the Multi-Version Concurrency Control (MVCC) engine detected Tx A's exclusive lock. Instead of forcing you to wait, it intelligently routed your query to the Undo-Log to seamlessly reconstruct the last pristine, committed snapshot of the data." />
+                                )}
+                                {!dirtyResult.isCollision && (
+                                    <EngineAnalysis type="success" title="System Stable" explanation="You read the database while no active sabotage was occurring. The database successfully rolled back the bad transaction and returned the true, committed state of the data." />
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -234,7 +270,7 @@ function ConcurrencyLab() {
                                     </div>
                                 </div>
 
-                                {repeatResult.isolation === 'READ COMMITTED' && (
+                                {repeatResult.isolation === 'READ COMMITTED' && repeatResult.read1 !== repeatResult.read2 && (
                                     <EngineAnalysis type="danger" title="Snapshot Regeneration" explanation="Under READ COMMITTED, the database creates a brand new snapshot for every single SELECT statement. When Read 2 executed, it saw the new reality that Tx B committed. If Tx A was calculating compound interest, half its math would be based on the old number, and half on the new number." />
                                 )}
                                 {repeatResult.isolation === 'REPEATABLE READ' && (
@@ -295,7 +331,7 @@ function ConcurrencyLab() {
                                     </div>
                                 </div>
 
-                                {phantomResult.isolation === 'READ COMMITTED' && (
+                                {phantomResult.isolation === 'READ COMMITTED' && phantomResult.count1 !== phantomResult.count2 && (
                                     <EngineAnalysis type="danger" title="Row Locks Cannot Catch Ghosts" explanation="Standard row-level locks only lock existing records. Because Tx B inserted a brand new record, it didn't trigger any locks. By the time Tx A counted the table a second time, the Phantom row had successfully materialized in the gap." />
                                 )}
                                 {phantomResult.isolation === 'SERIALIZABLE' && (

@@ -64,47 +64,48 @@ CREATE PROCEDURE ExecuteTransfer(
     IN p_amount DECIMAL(15, 2)
 )
 BEGIN
-    -- Declare variables to hold current balance and handle errors
     DECLARE current_balance DECIMAL(15, 2);
-    
-    -- Custom error handler: If anything fails, trigger a ROLLBACK automatically
+
+    -- Error Handler
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
         ROLLBACK;
-        -- Log the failure (Optional but good for audit)
         INSERT INTO Transactions (from_account, to_account, amount, status) 
         VALUES (p_from_account, p_to_account, p_amount, 'Failed');
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Transaction failed. Rolled back.';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Transaction failed and rolled back.';
     END;
 
-    -- 1. Start the ACID Transaction
     START TRANSACTION;
+    
+    -- 1A: Prevent negative or zero transfers
+    IF p_amount <= 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Exploit Blocked: Transfer amount must be greater than zero.';
+    END IF;
 
-    -- 2. Check balance with a row-level lock (FOR UPDATE prevents concurrency issues early)
+    -- 1B: Prevent self-transfers (loophole)
+    IF p_from_account = p_to_account THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Logic Error: Cannot transfer funds to the same account.';
+    END IF;
+    
+
+    -- Lock the sender's row for update
     SELECT balance INTO current_balance 
     FROM Accounts 
     WHERE account_id = p_from_account FOR UPDATE;
 
-    -- 3. Business Logic: Ensure sufficient funds
+    -- Check sufficient funds
     IF current_balance < p_amount THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Insufficient funds';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Insufficient funds.';
     END IF;
 
-    -- 4. Deduct from sender
-    UPDATE Accounts 
-    SET balance = balance - p_amount 
-    WHERE account_id = p_from_account;
-
-    -- 5. Add to receiver
-    UPDATE Accounts 
-    SET balance = balance + p_amount 
-    WHERE account_id = p_to_account;
-
-    -- 6. Record the transaction in the audit trail
+    -- Execute math
+    UPDATE Accounts SET balance = balance - p_amount WHERE account_id = p_from_account;
+    UPDATE Accounts SET balance = balance + p_amount WHERE account_id = p_to_account;
+    
+    -- Log success
     INSERT INTO Transactions (from_account, to_account, amount, status) 
     VALUES (p_from_account, p_to_account, p_amount, 'Completed');
 
-    -- 7. Commit the transaction (Redo Log persists it here)
     COMMIT;
 END //
 

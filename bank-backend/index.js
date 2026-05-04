@@ -106,9 +106,15 @@ app.post('/api/concurrency/tx-a', async (req, res) => {
 
         // Hold the dirty state in RAM for 5 seconds, then intentionally FAIL and rollback
         setTimeout(async () => {
-            await connection.query('ROLLBACK');
-            connection.release();
-            console.log("Tx A: Rolled back dirty data.");
+            try {
+                await connection.query('ROLLBACK');
+                console.log("Tx A: Rolled back dirty data.");
+            } catch (innerError) {
+                console.error("Tx A Timeout Error:", innerError);
+            } finally {
+
+                connection.release();
+            }
         }, 5000);
 
         res.json({ message: 'Tx A Started. Deducted $1000. Holding uncommitted state for 5s...' });
@@ -183,11 +189,17 @@ app.post('/api/concurrency/phantom-tx-b', async (req, res) => {
         await connection.query('COMMIT');
         connection.release();
 
-        // Auto-cleanup: Delete the phantom row after 10 seconds so the DB stays clean for the next test
+        // Auto-cleanup: Delete the phantom row after 10 seconds so the DB stays clean
         setTimeout(async () => {
-            const cleanConn = await pool.getConnection();
-            await cleanConn.query(`DELETE FROM Accounts WHERE balance = 777`);
-            cleanConn.release();
+            let cleanConn;
+            try {
+                cleanConn = await pool.getConnection();
+                await cleanConn.query(`DELETE FROM Accounts WHERE balance = 777`);
+            } catch (innerError) {
+                console.error("Phantom cleanup failed:", innerError);
+            } finally {
+                if (cleanConn) cleanConn.release(); // Securely return connection
+            }
         }, 10000);
 
         res.json({ message: 'Phantom Row Inserted Successfully! ($777)' });
@@ -242,9 +254,15 @@ app.post('/api/concurrency/repeat-tx-b', async (req, res) => {
 
         // Auto-cleanup: Add the $50 back after 10 seconds so the DB stays clean
         setTimeout(async () => {
-            const cleanConn = await pool.getConnection();
-            await cleanConn.query('UPDATE Accounts SET balance = balance + 50 WHERE account_id = 1');
-            cleanConn.release();
+            let cleanConn;
+            try {
+                cleanConn = await pool.getConnection();
+                await cleanConn.query('UPDATE Accounts SET balance = balance + 50 WHERE account_id = 1');
+            } catch (innerError) {
+                console.error("Repeatable cleanup failed:", innerError);
+            } finally {
+                if (cleanConn) cleanConn.release(); // Securely return connection
+            }
         }, 10000);
 
         res.json({ message: '$50 Deducted and COMMITTED!' });
