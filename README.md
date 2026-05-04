@@ -19,7 +19,7 @@ Developed by Information Technology students at the **Indian Institute of Inform
 | **Neel Ghule** | IIT2024267 |
 | **Adabala Sridhar** | IIT2024218 |
 | **Bendram Anjan Shiva Reddy** | IIT2024265 |
-=======
+
 ### 🎓 Academic Context
 **Developers:** -Shivam Mishra (Roll No: IIT2024215)  
                 -Ayush Anand (Roll No: IIT2024246)
