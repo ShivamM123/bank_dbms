@@ -39,9 +39,7 @@ app.post('/api/transfer', async (req, res) => {
     }
 });
 
-// ==========================================
-// 💥 RECOVERY LAB ROUTES (DOCKER CONTROL)
-// ==========================================
+// RECOVERY LAB ROUTES 
 
 // Start the slow transaction (Requires Docker DB on port 3307)
 app.post('/api/crash-lab/start-transfer', async (req, res) => {
@@ -49,7 +47,7 @@ app.post('/api/crash-lab/start-transfer', async (req, res) => {
         const connection = await require('mysql2/promise').createConnection({
             host: process.env.DB_HOST || '127.0.0.1',
             user: process.env.DB_USER || 'root',
-            password: 'password', // Hardcoded for the Docker container
+            password: 'password',
             database: process.env.DB_NAME || 'bank_db',
             port: 3307
         });
@@ -92,9 +90,7 @@ app.post('/api/crash-lab/recover', (req, res) => {
     });
 });
 
-// ==========================================
 // 🚦 CONCURRENCY LAB ROUTES
-// ==========================================
 
 // Transaction A: The Saboteur (Creates a Dirty state for 5 seconds)
 app.post('/api/concurrency/tx-a', async (req, res) => {
