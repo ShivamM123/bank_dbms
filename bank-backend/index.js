@@ -263,9 +263,7 @@ app.post('/api/concurrency/repeat-tx-b', async (req, res) => {
         res.status(500).json({ error: 'Tx B failed' });
     }
 });
-// ==========================================
-// 🚀 QUERY OPTIMIZATION LAB (INDEXING)
-// ==========================================
+//  QUERY OPTIMIZATION LAB (INDEXING)
 
 // 1. Run EXPLAIN and measure actual backend execution time
 app.get('/api/optimization/analyze', async (req, res) => {
