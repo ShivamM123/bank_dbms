@@ -41,7 +41,7 @@ app.post('/api/transfer', async (req, res) => {
 
 // RECOVERY LAB ROUTES 
 
-// Start the slow transaction (Requires Docker DB on port 3307)
+// Start the slow transaction ( Docker DB on port 3307)
 app.post('/api/crash-lab/start-transfer', async (req, res) => {
     try {
         const connection = await require('mysql2/promise').createConnection({
@@ -90,9 +90,9 @@ app.post('/api/crash-lab/recover', (req, res) => {
     });
 });
 
-// 🚦 CONCURRENCY LAB ROUTES
+// CONCURRENCY LAB ROUTES
 
-// Transaction A: The Saboteur (Creates a Dirty state for 5 seconds)
+// Transaction A: The Writer (Creates a Dirty state for 5 seconds)
 app.post('/api/concurrency/tx-a', async (req, res) => {
     const connection = await pool.getConnection(); // Grab a dedicated line
     try {
@@ -122,7 +122,7 @@ app.post('/api/concurrency/tx-a', async (req, res) => {
 
 // Transaction B: The Reader
 app.get('/api/concurrency/tx-b', async (req, res) => {
-    const { isolation } = req.query; // e.g., 'READ UNCOMMITTED' or 'READ COMMITTED'
+    const { isolation } = req.query; // dirty read
     const connection = await pool.getConnection();
     try {
         // Set the specific isolation level for this session
@@ -142,9 +142,7 @@ app.get('/api/concurrency/tx-b', async (req, res) => {
     }
 });
 
-// ==========================================
-// 👻 PHANTOM READ & SERIALIZABLE LAB
-// ==========================================
+// PHANTOM READ & SERIALIZABLE LAB
 
 // Phantom Tx A: The Range Auditor
 app.get('/api/concurrency/phantom-tx-a', async (req, res) => {
@@ -158,10 +156,10 @@ app.get('/api/concurrency/phantom-tx-a', async (req, res) => {
         const [rows1] = await connection.query('SELECT COUNT(*) as total FROM Accounts');
         const count1 = rows1[0].total;
 
-        // 2. Pause for 5 seconds to give Tx B a chance to sneak a row in
+        // 2. Pause for 5 secs to give Tx B a chance to no. of rows
         await new Promise(resolve => setTimeout(resolve, 5000));
 
-        // 3. Read the number of accounts again!
+        // 3. Read the number of accounts again
         const [rows2] = await connection.query('SELECT COUNT(*) as total FROM Accounts');
         const count2 = rows2[0].total;
 
@@ -205,9 +203,7 @@ app.post('/api/concurrency/phantom-tx-b', async (req, res) => {
     }
 });
 
-// ==========================================
-// 🔁 NON-REPEATABLE READ LAB
-// ==========================================
+// NON-REPEATABLE READ LAB
 
 // Repeatable Tx A: The Snapshot Reader
 app.get('/api/concurrency/repeat-tx-a', async (req, res) => {
