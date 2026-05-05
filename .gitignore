@@ -62,3 +62,5 @@ build/
 # OS metadata
 .DS_Store
 Thumbs.db
+GEMINI.md
+docker-compose.yml
