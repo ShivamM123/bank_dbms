@@ -9,27 +9,6 @@ An advanced, interactive Database Management System (DBMS) simulator designed to
 
 ---
 
-## 👥 Meet the Team
-Developed by Information Technology students at the **Indian Institute of Information Technology, Allahabad (IIITA)**.
-
-| Developer | Roll Number |
-| :--- | :--- |
-| **Shivam Mishra** | IIT2024215 |
-| **Ayush Anand** | IIT2024246 |
-| **Neel Ghule** | IIT2024267 |
-| **Adabala Sridhar** | IIT2024218 |
-| **Bendram Anjan Shiva Reddy** | IIT2024265 |
-
-### 🎓 Academic Context
-**Developers:** -Shivam Mishra (Roll No: IIT2024215)  
-                -Ayush Anand (Roll No: IIT2024246)
-                -Neel Ghule (Roll No: IIT2024267)
-                -Adabala Sridhar (Roll No: IIT2024218)
-                -Bendram Anjan Shiva Reddy (Roll No: IIT2024265)
-**Program:** Information Technology  
-**Institution:** Indian Institute of Information Technology, Allahabad (IIITA)
-
----
 
 ## 📖 Project Overview
 
